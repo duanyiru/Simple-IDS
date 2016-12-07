@@ -37,27 +37,28 @@ void takeAction(char* action, int pid);
 
 // Main method.
 int main(int argc, char** argv) {
-    parseCommandLine(argc, argv);
-    test = 0;
-    logFilePointer = fopen(logFile, "w");
+    parseCommandLine(argc, argv); // Parse command line arguments.
+    logFilePointer = fopen(logFile, "w"); // Open log file.
+
     char entry[40] = "Phunt program has started up, PID: ";
     int pid = getpid();
     char pidString[5];
     sprintf(pidString, "%d", pid);
     strcat(entry, pidString);
-    logEntry(entry);
+    logEntry(entry); // Log that program has started.
 
-    procFolder = opendir("/proc");
+    procFolder = opendir("/proc"); // Open /proc directory.
     parseConfigFile();
 
-    while(1) {
-        sleep(5);
+    // Continuously run program.
+    for(int i = 0; i < 2; i++) {
         loopThroughProcFolders();
+        sleep(5); // Checks the processes every 5 seconds.
     }
 
-    logEntry("Program terminating");
-    closedir(procFolder);
-    fclose(logFilePointer);
+    logEntry("Program terminating"); // Log that program has ended.
+    closedir(procFolder); // Close /proc directory.
+    fclose(logFilePointer); // Close log file.
 
     return 0;
 }
@@ -93,7 +94,8 @@ void parseCommandLine(int argc, char** argv) {
     }
 }
 
-// Determines the program instructions by parsing the config file.
+// Determines the program instructions by parsing the config
+// file, puts them in the global variable configuration.
 void parseConfigFile() {
     // Open the config file for reading.
     FILE *file;
@@ -121,23 +123,25 @@ void parseConfigFile() {
     fclose(file);
 }
 
-// Meat of the program. Loops through PID folders in /proc,
-// calls another function to check whether action needs
-// to be taken on that process. If so, carries specified action out.
+// Loops through PID folders in /proc, calls another
+// function to check whether action needs to be taken
+// on that process. If so, carries specified action out.
 void loopThroughProcFolders() {
     struct dirent* entry;
+    // Loop through folders in /proc.
     while(entry = readdir(procFolder)) {
-        if(isdigit(entry->d_name[0])) {
+        if(isdigit(entry->d_name[0])) { // If folder is named for a PID.
             int pid = atoi(entry->d_name);
             char processFolderName[20] = "/proc/";
-            strcat(processFolderName, entry->d_name);
+            strcat(processFolderName, entry->d_name); // processFolderName =  /proc/<pid>
 
             checkAgainstConfig(processFolderName, pid);
         }
     }
-    rewinddir(procFolder);
+    rewinddir(procFolder); // Reset directory at start.
 }
 
+// Checks a process' info against the information saved from the config file.
 void checkAgainstConfig(char* processFolderName, int pid) {
     char statusFileName[30];
     strcpy(statusFileName, processFolderName);
@@ -148,27 +152,27 @@ void checkAgainstConfig(char* processFolderName, int pid) {
     int* memory = (int*)malloc(5);
     char* path = (char*)malloc(200);
     memset(path, '\0', 200);
-    getStatusFileInfo(statusFileName, &username, memory);
-    getPathInfo(processFolderName, &path);
 
-    for(int i = 0; i < configRows; i++) {
+    getStatusFileInfo(statusFileName, &username, memory); // Get username and memory.
+    getPathInfo(processFolderName, &path); // Get directory the process is running in.
+
+    for(int i = 0; i < configRows; i++) { // Go through every entry stored in configuration.
         char action[10], type[10], param[100], config[40];
         memset(action, '\0', 10);
         memset(type, '\0', 10);
         memset(param, '\0', 100);
         memset(config, '\0', 40);
 
-        strcpy(config, configuration[i]);
-        // printf("%d : %s\n", pid, config);
+        strcpy(config, configuration[i]); // ex. config = "kill user badguy"
         strcpy(action, strtok(config, " \t\n"));
         strcpy(type, strtok(NULL, " \t\n"));
         strcpy(param, strtok(NULL, " \t\n"));
 
-        if(strcmp(type, "user") == 0) {
+        if(strcmp(type, "user") == 0) { // type = user
             checkUser(action, param, username, pid);
-        } else if(strcmp(type, "path") == 0) {
+        } else if(strcmp(type, "path") == 0) { // type = path
             checkPath(action, param, path, pid);
-        } else if(strcmp(type, "memory") == 0) {
+        } else if(strcmp(type, "memory") == 0) { // type = memory
             checkMemory(action, param, *memory, pid);
         }
     }
@@ -178,10 +182,12 @@ void checkAgainstConfig(char* processFolderName, int pid) {
     free(path);
 }
 
+// Get the username of the owner of the process and the amount of memory it's using.
+// Store this information in the variables username and memory.
 void getStatusFileInfo(char* statusFileName, char** username, int* memory) {
     uid_t uid = 0;
     FILE* file;
-    file = fopen(statusFileName, "r");
+    file = fopen(statusFileName, "r"); // Read info from the status file.
     char* line = (char*)malloc(50);
     size_t length = 0;
     size_t size;
@@ -189,18 +195,18 @@ void getStatusFileInfo(char* statusFileName, char** username, int* memory) {
     // Go through each line of the status file.
     int reachedUID = 0;
     int reachedMemory = 0;
-    while((size = getline(&line, &length, file)) != -1) {
+    while((size = getline(&line, &length, file)) != -1) { // Go through each line.
         char* word = (char*)malloc(15);
-        word = strtok(line, " \t\n");
-        if(strcmp(word, "Uid:") == 0) reachedUID = 1;
-        if(strcmp(word, "VmSize:") == 0) reachedMemory = 1;
-        while(word != NULL) {
+        word = strtok(line, " \t\n"); // Get the first word.
+        if(strcmp(word, "Uid:") == 0) reachedUID = 1; // If line contains the UID.
+        if(strcmp(word, "VmSize:") == 0) reachedMemory = 1; // If line contains the memory usage.
+        while(word != NULL) { // Loop through the rest of the words.
             word = strtok(NULL, " \t\n");
             if(reachedUID == 1) {
                 uid = atoi(word);
                 reachedUID = 0;
             } else if(reachedMemory == 1) {
-                *memory = (atoi(word) / 1000);
+                *memory = (atoi(word) / 1000); // Convert to MB and set memory.
                 reachedMemory = 0;
             }
         }
@@ -210,9 +216,10 @@ void getStatusFileInfo(char* statusFileName, char** username, int* memory) {
     free(line);
     fclose(file);
     struct passwd *password = getpwuid(uid);
-    strcpy(*username, password->pw_name);
+    strcpy(*username, password->pw_name); // Set username to the proper value.
 }
 
+// Get the path the process is running in, set path to this value.
 void getPathInfo(char* processFolderName, char** path) {
     char symbolicLinkName[30];
     strcpy(symbolicLinkName, processFolderName);
@@ -221,18 +228,21 @@ void getPathInfo(char* processFolderName, char** path) {
     readlink(symbolicLinkName, *path, 200);
 }
 
+// Check if this config entry restricts the owner of the process.
 void checkUser(char* action, char* param, char* username, int pid) {
     if(strcmp(param, username) == 0) {
         takeAction(action, pid);
     }
 }
 
+// Check if this config entry restricts the path this process is running in.
 void checkPath(char* action, char* param, char* path, int pid) {
     if(strcmp(param, path) == 0) {
         takeAction(action, pid);
     }
 }
 
+// Check if the process is using more memory than allowed by this config entry.
 void checkMemory(char* action, char* param, int memory, int pid) {
     int restriction = atoi(param);
     if(restriction < memory) {
@@ -240,6 +250,7 @@ void checkMemory(char* action, char* param, int memory, int pid) {
     }
 }
 
+// The process violates a config file restriction, decide what to do with it.
 void takeAction(char* action, int pid) {
     char entry[65];
     char pidString[5];
@@ -263,7 +274,7 @@ void takeAction(char* action, int pid) {
             strcat(entry, pidString);
         }
     } else if(strcmp(action, "nice") == 0) {
-        int status = setpriority(PRIO_PROCESS, pid, -20);
+        int status = setpriority(PRIO_PROCESS, pid, 19);
         if(status > -1) {
             strcpy(entry, "Niced process with PID ");
             strcat(entry, pidString);
