@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <signal.h>
+#include <time.h>
 #include <sys/resource.h>
 #define CONFIG 100
 
@@ -14,11 +15,14 @@
 char logFile[100];
 char configFile[100];
 int configRows = 0;
+FILE* logFilePointer;
+
 // Will hold an array of restrictions as strings (i.e. "kill user badguy")
 char configuration[CONFIG][40];
 int test;
 
 // Function declarations.
+void logEntry(char* entry);
 void parseCommandLine(int argc, char** argv);
 void parseConfigFile();
 void loopThroughProcFolders();
@@ -34,10 +38,33 @@ void takeAction(char* action, int pid);
 int main(int argc, char** argv) {
     test = 0;
     parseCommandLine(argc, argv);
+
+    logFilePointer = fopen(logFile, "w");
+    char entry[40] = "Phunt program has started up, PID: ";
+    int pid = getpid();
+    char pidString[5];
+    sprintf(pidString, "%d", pid);
+    strcat(entry, pidString);
+    logEntry(entry);
+
     parseConfigFile();
     loopThroughProcFolders();
 
+    logEntry("Program terminating");
+    fclose(logFilePointer);
+
     return 0;
+}
+
+// Called to print to log file.
+void logEntry(char* entry) {
+    time_t currentTime = time(NULL);
+    char timeString[30];
+    strcpy(timeString, asctime(localtime(&currentTime)));
+    timeString[strlen(timeString) - 1] = '\0';
+
+    fprintf(logFilePointer, "%s : ", timeString);
+    fprintf(logFilePointer, "%s\n", entry);
 }
 
 // Parses the command line options and sets the config and log files accordingly.
@@ -82,6 +109,8 @@ void parseConfigFile() {
             configRows++;
         }
     }
+
+    logEntry("Config file parsed successfully");
 
     fclose(file);
 }
@@ -209,26 +238,36 @@ void checkMemory(char* action, char* param, int memory, int pid) {
 }
 
 void takeAction(char* action, int pid) {
+    char entry[65];
+    char pidString[5];
+    sprintf(pidString, "%d", pid);
     if(strcmp(action, "kill") == 0) {
-        printf("Kill\n");
-
-
-
-
-
-        // kill(pid, SIGKILL);
+        int status = kill(pid, SIGKILL);
+        if(status > -1) {
+            strcpy(entry, "Killed process with PID ");
+            strcat(entry, pidString);
+        } else {
+            strcpy(entry, "Something went wrong. Failed to kill process with PID ");
+            strcat(entry, pidString);
+        }
     } else if(strcmp(action, "suspend") == 0) {
-        printf("Suspend\n");
-
-
-
-
-        // kill(pid, SIGTSTP);
+        int status = kill(pid, SIGTSTP);
+        if(status > -1) {
+            strcpy(entry, "Suspended process with PID ");
+            strcat(entry, pidString);
+        } else {
+            strcpy(entry, "Something went wrong. Failed to suspend process with PID ");
+            strcat(entry, pidString);
+        }
     } else if(strcmp(action, "nice") == 0) {
-        printf("Nice\n");
-
-
-
-        // setpriority(PRIO_PROCESS, pid, -20);
+        int status = setpriority(PRIO_PROCESS, pid, -20);
+        if(status > -1) {
+            strcpy(entry, "Niced process with PID ");
+            strcat(entry, pidString);
+        } else {
+            strcpy(entry, "Something went wrong. Failed to nice process with PID ");
+            strcat(entry, pidString);
+        }
     }
+    logEntry(entry);
 }
