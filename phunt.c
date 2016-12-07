@@ -16,10 +16,11 @@ char logFile[100];
 char configFile[100];
 int configRows = 0;
 FILE* logFilePointer;
+DIR* procFolder;
+int test;
 
 // Will hold an array of restrictions as strings (i.e. "kill user badguy")
 char configuration[CONFIG][40];
-int test;
 
 // Function declarations.
 void logEntry(char* entry);
@@ -36,9 +37,8 @@ void takeAction(char* action, int pid);
 
 // Main method.
 int main(int argc, char** argv) {
-    test = 0;
     parseCommandLine(argc, argv);
-
+    test = 0;
     logFilePointer = fopen(logFile, "w");
     char entry[40] = "Phunt program has started up, PID: ";
     int pid = getpid();
@@ -47,10 +47,16 @@ int main(int argc, char** argv) {
     strcat(entry, pidString);
     logEntry(entry);
 
+    procFolder = opendir("/proc");
     parseConfigFile();
-    loopThroughProcFolders();
+
+    while(1) {
+        sleep(5);
+        loopThroughProcFolders();
+    }
 
     logEntry("Program terminating");
+    closedir(procFolder);
     fclose(logFilePointer);
 
     return 0;
@@ -119,11 +125,8 @@ void parseConfigFile() {
 // calls another function to check whether action needs
 // to be taken on that process. If so, carries specified action out.
 void loopThroughProcFolders() {
-    DIR* directory;
     struct dirent* entry;
-
-    directory = opendir("/proc");
-    while(entry = readdir(directory)) {
+    while(entry = readdir(procFolder)) {
         if(isdigit(entry->d_name[0])) {
             int pid = atoi(entry->d_name);
             char processFolderName[20] = "/proc/";
@@ -132,6 +135,7 @@ void loopThroughProcFolders() {
             checkAgainstConfig(processFolderName, pid);
         }
     }
+    rewinddir(procFolder);
 }
 
 void checkAgainstConfig(char* processFolderName, int pid) {
@@ -146,7 +150,6 @@ void checkAgainstConfig(char* processFolderName, int pid) {
     memset(path, '\0', 200);
     getStatusFileInfo(statusFileName, &username, memory);
     getPathInfo(processFolderName, &path);
-    if(*memory > test) test = *memory;
 
     for(int i = 0; i < configRows; i++) {
         char action[10], type[10], param[100], config[40];
@@ -156,7 +159,7 @@ void checkAgainstConfig(char* processFolderName, int pid) {
         memset(config, '\0', 40);
 
         strcpy(config, configuration[i]);
-
+        // printf("%d : %s\n", pid, config);
         strcpy(action, strtok(config, " \t\n"));
         strcpy(type, strtok(NULL, " \t\n"));
         strcpy(param, strtok(NULL, " \t\n"));
