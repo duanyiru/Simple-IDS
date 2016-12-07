@@ -46,19 +46,18 @@ int main(int argc, char** argv) {
     sprintf(pidString, "%d", pid);
     strcat(entry, pidString);
     logEntry(entry); // Log that program has started.
+    fclose(logFilePointer);
 
     procFolder = opendir("/proc"); // Open /proc directory.
     parseConfigFile();
 
     // Continuously run program.
-    for(int i = 0; i < 2; i++) {
+    while(1) {
+        logFilePointer = fopen(logFile, "a");
         loopThroughProcFolders();
+        fclose(logFilePointer);
         sleep(5); // Checks the processes every 5 seconds.
     }
-
-    logEntry("Program terminating"); // Log that program has ended.
-    closedir(procFolder); // Close /proc directory.
-    fclose(logFilePointer); // Close log file.
 
     return 0;
 }
