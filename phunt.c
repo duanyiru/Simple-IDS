@@ -17,8 +17,6 @@ char configFile[100];
 int configRows = 0;
 FILE* logFilePointer;
 DIR* procFolder;
-int test;
-
 // Will hold an array of restrictions as strings (i.e. "kill user badguy")
 char configuration[CONFIG][40];
 
