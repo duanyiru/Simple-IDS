@@ -230,13 +230,25 @@ void getPathInfo(char* processFolderName, char** path) {
 // Check if this config entry restricts the owner of the process.
 void checkUser(char* action, char* param, char* username, int pid) {
     if(strcmp(param, username) == 0) {
+        logEntry("Found process running with restricted user");
         takeAction(action, pid);
     }
 }
 
 // Check if this config entry restricts the path this process is running in.
 void checkPath(char* action, char* param, char* path, int pid) {
-    if(strcmp(param, path) == 0) {
+    int len = strlen(param);
+    char compare[len + 1];
+
+    // We wish to compare the restricted path (param) with process' path (path).
+    // We do this by comparing the first part of the process' path with param.
+    for(int i = 0; i < len; i++) {
+        compare[i] = path[i];
+    }
+    compare[len] = '\0';
+
+    if(strcmp(param, compare) == 0) {
+        logEntry("Found process running in restricted directory");
         takeAction(action, pid);
     }
 }
@@ -245,6 +257,7 @@ void checkPath(char* action, char* param, char* path, int pid) {
 void checkMemory(char* action, char* param, int memory, int pid) {
     int restriction = atoi(param);
     if(restriction < memory) {
+        logEntry("Found process using an excessive amount of memory");
         takeAction(action, pid);
     }
 }
@@ -275,7 +288,7 @@ void takeAction(char* action, int pid) {
     } else if(strcmp(action, "nice") == 0) {
         int status = setpriority(PRIO_PROCESS, pid, 19);
         if(status > -1) {
-            strcpy(entry, "Niced process with PID ");
+            strcpy(entry, "Lowered priority of process with PID ");
             strcat(entry, pidString);
         } else {
             strcpy(entry, "Something went wrong. Failed to nice process with PID ");
